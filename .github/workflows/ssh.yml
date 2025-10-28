@@ -1,10 +1,10 @@
-name: SSH Access
+name: SSH to Localhost
 
 on:
   workflow_dispatch:  # Manual trigger
 
 jobs:
-  ssh-connection:
+  ssh-local:
     runs-on: ubuntu-latest
 
     steps:
@@ -14,18 +14,13 @@ jobs:
       - name: Setup SSH key
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          # Generate a temporary key for localhost testing
+          ssh-keygen -t rsa -b 2048 -f ~/.ssh/id_rsa -N "" -q
+          cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys
           chmod 600 ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/authorized_keys
+          ssh-keyscan -H localhost >> ~/.ssh/known_hosts
 
-          # Ensure SSH_HOST is not empty
-          if [ -z "${{ secrets.SSH_HOST }}" ]; then
-            echo "Error: SSH_HOST secret is empty"
-            exit 1
-          fi
-
-          # Correct usage of ssh-keyscan
-          ssh-keyscan -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts
-
-      - name: Test SSH connection
+      - name: Test SSH connection to localhost
         run: |
-          ssh -o StrictHostKeyChecking=no "${{ secrets.SSH_USER }}"@"${{ secrets.SSH_HOST }}" "echo '✅ SSH connection successful!'"
+          ssh -o StrictHostKeyChecking=no runner@localhost "echo '✅ SSH connection successful!'"
