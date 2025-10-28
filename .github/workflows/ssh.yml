@@ -16,8 +16,16 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+
+          # Ensure SSH_HOST is not empty
+          if [ -z "${{ secrets.SSH_HOST }}" ]; then
+            echo "Error: SSH_HOST secret is empty"
+            exit 1
+          fi
+
+          # Correct usage of ssh-keyscan
+          ssh-keyscan -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts
 
       - name: Test SSH connection
         run: |
-          ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "echo 'neofetch'"
+          ssh -o StrictHostKeyChecking=no "${{ secrets.SSH_USER }}"@"${{ secrets.SSH_HOST }}" "echo '✅ SSH connection successful!'"
