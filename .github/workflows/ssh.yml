@@ -1,35 +1,28 @@
-name: SSH to Localhost with Password
+name: Keep SSH Server Running
 
 on:
   workflow_dispatch:
 
 jobs:
-  ssh-local-password:
+  ssh-server:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
-      - name: Install SSH server
+      - name: Install SSH server and sshpass
         run: |
           sudo apt-get update
-          sudo apt-get install -y openssh-server
+          sudo apt-get install -y openssh-server sshpass
           sudo systemctl enable ssh
           sudo systemctl start ssh
 
-      - name: Set SSH password for runner
+      - name: Set runner password
         run: |
           echo "runner:gex" | sudo chpasswd
-
-      - name: Enable password authentication
-        run: |
           sudo sed -i 's/^#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config
           sudo sed -i 's/^PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config
           sudo systemctl restart ssh
 
-      - name: Test SSH connection
+      - name: Keep SSH server running
         run: |
-          sshpass -p "gex" ssh -o StrictHostKeyChecking=no runner@localhost "echo '✅ SSH connection successful!'"
-
-      - name: Install sshpass (needed for password SSH)
-        run: sudo apt-get install -y sshpass
+          echo "✅ SSH server is running. You can now SSH into the runner with user 'runner' and password 'gex'."
+          # Keep the job alive indefinitely
+          tail -f /dev/null
