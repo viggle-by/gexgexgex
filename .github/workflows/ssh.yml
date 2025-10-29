@@ -1,4 +1,4 @@
-name: Interactive SSH Session with tmate
+name: Interactive SSH Session with systemd
 
 on:
   workflow_dispatch:
@@ -7,22 +7,82 @@ jobs:
   live-ssh:
     runs-on: ubuntu-latest
     steps:
-      - name: Install tmate, neofetch, xauth
+      - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y tmate neofetch
+          sudo apt-get install -y openssh-server neofetch curl jq systemd
 
-      - name: Start tmate session
+      - name: Configure SSH via systemd
         run: |
-          # Start a tmate session in detached mode
-          tmate -S /tmp/tmate.sock new-session -d
-          
-          # Wait until session is ready
-          tmate -S /tmp/tmate.sock wait tmate-ready
-          
-          # Print SSH connection info
-          tmate -S /tmp/tmate.sock display -p '#{tmate_ssh}'
-          tmate -S /tmp/tmate.sock display -p '#{tmate_web}'
-          
-          # Keep the session alive
-          tail -f /dev/null
+          # Enable SSH service and allow root login
+          echo "PermitRootLogin yes" | sudo tee -a /etc/ssh/sshd_config
+          echo "PasswordAuthentication yes" | sudo tee -a /etc/ssh/sshd_config
+          echo "ClientAliveInterval 120" | sudo tee -a /etc/ssh/sshd_config
+          echo "ClientAliveCountMax 3" | sudo tee -a /etc/ssh/sshd_config
+
+          # Set root password
+          echo "root:password" | sudo chpasswd
+
+          # Enable and start ssh service
+          sudo systemctl enable ssh
+          sudo systemctl restart ssh
+          sudo systemctl status ssh --no-pager
+
+      - name: Install ngrok
+        run: |
+          curl -sSL https://ngrok-agent.s3.amazonaws.com/ngrok.asc | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null
+          echo "deb https://ngrok-agent.s3.amazonaws.com buster main" | sudo tee /etc/apt/sources.list.d/ngrok.list
+          sudo apt-get update && sudo apt-get install -y ngrok
+
+      - name: Start ngrok via systemd
+        env:
+          NGROK_AUTH_TOKEN: 34X9kAeqnxi5nMPmlH5i4oat2vK_74JyC3mV756via2yQHCSB
+        run: |
+          # Add ngrok auth token
+          ngrok config add-authtoken "$NGROK_AUTH_TOKEN"
+
+          # Create a systemd service for ngrok tunnel
+          cat <<EOF | sudo tee /etc/systemd/system/ngrok-ssh.service
+          [Unit]
+          Description=Ngrok tunnel for SSH
+          After=network-online.target
+          Wants=network-online.target
+
+          [Service]
+          ExecStart=/usr/bin/ngrok tcp 22 --region=us
+          Restart=always
+          RestartSec=10
+          StandardOutput=append:/var/log/ngrok.log
+          StandardError=append:/var/log/ngrok.log
+
+          [Install]
+          WantedBy=multi-user.target
+          EOF
+
+          # Enable and start the ngrok service
+          sudo systemctl daemon-reload
+          sudo systemctl enable ngrok-ssh
+          sudo systemctl start ngrok-ssh
+
+          # Wait a bit for ngrok to initialize
+          sleep 8
+
+      - name: Display connection info
+        run: |
+          echo "-------------------------------------------------------"
+          echo "🔍 Fetching ngrok tunnel info..."
+          curl -s localhost:4040/api/tunnels | jq -r '.tunnels[0].public_url'
+          echo "-------------------------------------------------------"
+          echo "🚀 Connect using:"
+          echo
+          echo "ssh root@<HOST> -p <PORT>"
+          echo "Password: password"
+          echo
+          echo "Replace <HOST> and <PORT> with the info from ngrok above."
+          echo "-------------------------------------------------------"
+          sudo systemctl status ngrok-ssh --no-pager || true
+          echo "🖥️ System info:"
+          neofetch
+          echo "-------------------------------------------------------"
+          echo "🕐 Keeping system active..."
+          sudo journalctl -f -u ngrok-ssh
