@@ -7,12 +7,12 @@ jobs:
   live-ssh:
     runs-on: ubuntu-latest
     container:
-      image: kdeneon/all:user
+      image: mysticplasma:latest
     steps:
       - name: Install tmate, neofetch, xauth
         run: |
           sudo apt-get update
-          sudo apt-get install -y tmate neofetch xauth && userdel -f -r neon && useradd runner && usermod -a -G sudo runner
+          sudo apt-get install -y tmate neofetch
 
       - name: Start tmate session
         run: |
