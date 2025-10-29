@@ -43,7 +43,7 @@ jobs:
 
           # Store password file for xpra authentication
           echo "$XPRA_PASSWORD" | sudo tee /home/mysticgiggle/.xpra_pass >/dev/null
-          sudo chown xprauser:xprauser /home/mysticgiggle/.xpra_pass
+          sudo chown mysticgiggle:xprauser /home/mysticgiggle/.xpra_pass
           sudo chmod 600 /home/mysticgiggle/.xpra_pass
 
           # Enable and start the xpra service
@@ -97,7 +97,7 @@ jobs:
           echo "$XPRA_URL"
           echo "-------------------------------------------------------"
           echo "🔑 Login credentials:"
-          echo "Username: xprauser"
+          echo "Username: mysticgiggle"
           echo "Password: password"
           echo "-------------------------------------------------------"
           echo "🖥️ System Info:"
