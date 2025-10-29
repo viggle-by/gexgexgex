@@ -6,8 +6,6 @@ on:
 jobs:
   live-ssh:
     runs-on: ubuntu-latest
-    container:
-      image: mysticplasma:latest
     steps:
       - name: Install tmate, neofetch, xauth
         run: |
