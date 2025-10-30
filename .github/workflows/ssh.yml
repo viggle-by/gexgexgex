@@ -1,107 +1,28 @@
-name: Interactive Xpra Session (systemd)
+name: Interactive SSH Session with tmate
 
 on:
   workflow_dispatch:
 
 jobs:
-  live-xpra:
+  live-ssh:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Install dependencies
+      - name: Install tmate
         run: |
           sudo apt-get update
-          sudo apt-get install -y xpra xvfb x11-apps xterm neofetch curl jq systemd dbus-x11
+          sudo apt-get install -y tmate neofetch
 
-      - name: Start Xpra via systemd
-        env:
-          XPRA_PASSWORD: "password"
+      - name: Start tmate session
         run: |
-          # Create a user for xpra to avoid running as root
-          sudo useradd -m mysticgiggle || true
-          echo "mysticgiggle:$XPRA_PASSWORD" | sudo chpasswd
-
-          # Create a systemd service for Xpra HTML5 web interface
-          cat <<'EOF' | sudo tee /etc/systemd/system/xpra.service
-          [Unit]
-          Description=Xpra HTML5 remote desktop service
-          After=network-online.target
-          Wants=network-online.target
-
-          [Service]
-          User=mysticgiggle
-          Environment=DISPLAY=:100
-          ExecStart=/usr/bin/xpra start :100 --start-child=xterm \
-            --bind-tcp=0.0.0.0:14500 \
-            --html=on --auth=password --password-file=/home/mysticgiggle/.xpra_pass
-          Restart=always
-          RestartSec=10
-
-          [Install]
-          WantedBy=multi-user.target
-          EOF
-
-          # Store password file for xpra authentication
-          echo "$XPRA_PASSWORD" | sudo tee /home/mysticgiggle/.xpra_pass >/dev/null
-          sudo chown mysticgiggle:xprauser /home/mysticgiggle/.xpra_pass
-          sudo chmod 600 /home/mysticgiggle/.xpra_pass
-
-          # Enable and start the xpra service
-          sudo systemctl daemon-reload
-          sudo systemctl enable xpra
-          sudo systemctl start xpra
-          sudo systemctl status xpra --no-pager
-
-      - name: Install ngrok
-        run: |
-          curl -sSL https://ngrok-agent.s3.amazonaws.com/ngrok.asc | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null
-          echo "deb https://ngrok-agent.s3.amazonaws.com buster main" | sudo tee /etc/apt/sources.list.d/ngrok.list
-          sudo apt-get update && sudo apt-get install -y ngrok
-
-      - name: Start ngrok tunnel for Xpra
-        env:
-          NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
-        run: |
-          ngrok config add-authtoken "$NGROK_AUTH_TOKEN"
-
-          # Create ngrok systemd service
-          cat <<EOF | sudo tee /etc/systemd/system/ngrok-xpra.service
-          [Unit]
-          Description=Ngrok tunnel for Xpra web
-          After=network-online.target
-          Wants=network-online.target
-
-          [Service]
-          ExecStart=/usr/bin/ngrok http 14500 --region=us
-          Restart=always
-          RestartSec=10
-          StandardOutput=append:/var/log/ngrok-xpra.log
-          StandardError=append:/var/log/ngrok-xpra.log
-
-          [Install]
-          WantedBy=multi-user.target
-          EOF
-
-          sudo systemctl daemon-reload
-          sudo systemctl enable ngrok-xpra
-          sudo systemctl start ngrok-xpra
-          sleep 8
-
-      - name: Display connection info
-        run: |
-          echo "-------------------------------------------------------"
-          echo "🌐 Fetching public ngrok URL..."
-          XPRA_URL=$(curl -s localhost:4040/api/tunnels | jq -r '.tunnels[0].public_url')
-          echo "-------------------------------------------------------"
-          echo "🚀 Connect in your browser:"
-          echo "$XPRA_URL"
-          echo "-------------------------------------------------------"
-          echo "🔑 Login credentials:"
-          echo "Username: mysticgiggle"
-          echo "Password: password"
-          echo "-------------------------------------------------------"
-          echo "🖥️ System Info:"
-          neofetch
-          echo "-------------------------------------------------------"
-          echo "Keeping service logs running..."
-          sudo journalctl -f -u ngrok-xpra -u xpra
+          # Start a tmate session in detached mode
+          tmate -S /tmp/tmate.sock new-session -d
+          
+          # Wait until session is ready
+          tmate -S /tmp/tmate.sock wait tmate-ready
+          
+          # Print SSH connection info
+          tmate -S /tmp/tmate.sock display -p '#{tmate_ssh}'
+          tmate -S /tmp/tmate.sock display -p '#{tmate_web}'
+          
+          # Keep the session alive
+          tail -f /dev/null
